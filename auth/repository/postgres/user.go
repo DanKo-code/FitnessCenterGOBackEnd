@@ -13,18 +13,19 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-func (ur *UserRepository) GetUserByEmail(email string) (*models.Client, error) {
-	var client models.Client
-	result, err := ur.db.Where("Email = ?", email).First(&models.Client{}).Rows()
-	if err != nil {
+func (ur *UserRepository) GetUserByEmail(email string) (*models.User, error) {
+	var client models.User
+	if err := ur.db.Where("Email = ?", email).First(&client).Error; err != nil {
 		return nil, err
 	}
 
-	for result.Next() {
-		if err := ur.db.ScanRows(result, &client); err != nil {
-			return nil, err
-		}
+	return &client, nil
+}
+
+func (ur *UserRepository) CreateUser(user models.User) (*models.User, error) {
+	if err := ur.db.Create(&user).Error; err != nil {
+		return nil, err
 	}
 
-	return &client, nil
+	return &user, nil
 }

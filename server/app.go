@@ -1,25 +1,69 @@
 package server
 
 import (
+	"FitnessCenter_GoBackEnd/auth"
+	authhttp "FitnessCenter_GoBackEnd/auth/delivery/http"
+	authpostgres "FitnessCenter_GoBackEnd/auth/repository/postgres"
+	authusecase "FitnessCenter_GoBackEnd/auth/usecase"
+	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"time"
 )
 
 type App struct {
 	httpServer *http.Server
 
-	//authUC _
+	authUC auth.UseCase
 }
 
 func NewApp() *App {
-	return &App{}
+	db := initDB()
+
+	userRepo := authpostgres.NewUserRepository(db)
+
+	return &App{
+		authUC: authusecase.NewAuthUseCase(userRepo),
+	}
 }
 
-func InitDB() *gorm.DB {
+func (a *App) Run(port string) error {
+	router := gin.Default()
+
+	authhttp.RegisterHTTPEndpoints(router, a.authUC)
+
+	// HTTP Server
+	a.httpServer = &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
+
+	go func() {
+		if err := a.httpServer.ListenAndServe(); err != nil {
+			log.Fatalf("Failed to listen and serve: %+v", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, os.Interrupt)
+
+	<-quit
+
+	ctx, shutdown := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdown()
+
+	return a.httpServer.Shutdown(ctx)
+}
+
+func initDB() *gorm.DB {
 	dsn := fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		viper.GetString("postgresDNS.host"),
