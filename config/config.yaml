@@ -1,0 +1,12 @@
+port: 8000
+
+postgresDNS:
+  host: "localhost"
+  user: "fitnesscenteruser"
+  password: "tanki@danik2003"
+  dbname: "fitnesscenterdb"
+  port: "5432"
+  sslmode: "disable"
+  TimeZone: "Europe/Moscow"
+
+jwtSecret: "danilaKozlyakovsky4k1s"
