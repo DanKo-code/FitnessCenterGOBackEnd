@@ -5,9 +5,12 @@ import (
 	authhttp "FitnessCenter_GoBackEnd/auth/delivery/http"
 	authpostgres "FitnessCenter_GoBackEnd/auth/repository/postgres"
 	authusecase "FitnessCenter_GoBackEnd/auth/usecase"
+	"FitnessCenter_GoBackEnd/validators"
 	"context"
 	"fmt"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/spf13/viper"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -29,16 +32,32 @@ func NewApp() *App {
 	db := initDB()
 
 	userRepo := authpostgres.NewUserRepository(db)
+	refreshSessionRepo := authpostgres.NewRefreshSessionRepository(db)
 
 	return &App{
-		authUC: authusecase.NewAuthUseCase(userRepo),
+		authUC: authusecase.NewAuthUseCase(userRepo, refreshSessionRepo),
 	}
 }
 
 func (a *App) Run(port string) error {
 	router := gin.Default()
 
-	authhttp.RegisterHTTPEndpoints(router, a.authUC)
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},                            // Allow requests from this origin
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}, // Allowed HTTP methods
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},          // Allowed headers
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,           // Allow cookies (if needed)
+		MaxAge:           12 * time.Hour, // How long the results of a preflight request can be cached
+	}))
+
+	validate := validator.New()
+	err := validate.RegisterValidation("validFirstName", validators.ValidateUsreFisrtName)
+	if err != nil {
+		return nil
+	}
+
+	authhttp.RegisterHTTPEndpoints(router, a.authUC, validate)
 
 	// HTTP Server
 	a.httpServer = &http.Server{
@@ -86,14 +105,4 @@ func initDB() *gorm.DB {
 	}
 
 	return db
-	/*result, err := db.First(&Client{}).Rows()
-	if err != nil {
-		fmt.Println("Error: ", result)
-	}
-
-	for result.Next() {
-		var client Client
-		db.ScanRows(result, &client) // Scan each row into a client
-		fmt.Printf("Client: %+v\n", client)
-	}*/
 }

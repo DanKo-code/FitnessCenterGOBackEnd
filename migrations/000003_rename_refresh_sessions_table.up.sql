@@ -1,0 +1,1 @@
+ALTER TABLE refresh_sessions RENAME TO refresh_session;

@@ -8,3 +8,5 @@ postgresDNS:
   port: "5432"
   sslmode: "disable"
   TimeZone: "Europe/Moscow"
+
+jwtSecret: "danilaKozlyakovsky4k1s"

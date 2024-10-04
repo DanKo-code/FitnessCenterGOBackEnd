@@ -18,16 +18,4 @@ func main() {
 	if err := app.Run(viper.GetString("port")); err != nil {
 		log.Fatalf("%s", err.Error())
 	}
-	/*db := server.InitDB()
-
-	pr := authpostgres.NewUserRepository(db)
-
-	client, err := pr.GetUserByEmail("jane.smith@example.com")
-
-	if err != nil {
-		log.Fatalf("%s", err.Error())
-	}
-
-	fmt.Printf("Client: %+v", client)
-	*/
 }
