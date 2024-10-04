@@ -12,4 +12,5 @@ type UserRepository interface {
 type RefreshSessionRepository interface {
 	CreateRefreshSession(refreshSession models.RefreshSession) (*models.RefreshSession, error)
 	DeleteRefreshSession(refreshToken string) error
+	GetRefreshSession(refreshToken string) (*models.RefreshSession, error)
 }
