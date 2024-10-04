@@ -6,6 +6,7 @@ import (
 	"FitnessCenter_GoBackEnd/dtos"
 	"FitnessCenter_GoBackEnd/models"
 	"context"
+	"errors"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
@@ -124,6 +125,75 @@ func (a *AuthUseCase) LogOut(refreshToken string) error {
 	return a.refreshSessionRepo.DeleteRefreshSession(refreshToken)
 }
 
+func (a *AuthUseCase) Refresh(fingerprint string, refreshToken string) (*models.User, string, string, error) {
+	refreshSession, err := a.refreshSessionRepo.GetRefreshSession(refreshToken)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	if fingerprint != refreshSession.FingerPrint {
+		return nil, "", "", errors.New("bad fingerprint")
+	}
+
+	if err := a.refreshSessionRepo.DeleteRefreshSession(refreshToken); err != nil {
+		return nil, "", "", err
+	}
+
+	token, err := verifyRefreshToken(refreshToken)
+	if err != nil {
+		log.Fatalf("Token verification failed: %v", err)
+		return nil, "", "", err
+	}
+
+	var payload *payload = new(payload)
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		// Access specific claim data
+		if id, ok := claims["id"].(string); ok {
+			payload.clientId, _ = uuid.Parse(id)
+		}
+
+		if email, ok := claims["email"].(string); ok {
+			payload.email = email
+		}
+
+		// You can access other claims here
+	} else {
+		log.Println("Invalid JWT token")
+	}
+
+	var jwtSecret = []byte(viper.GetString("jwtSecret"))
+
+	var accessTokenNew, refreshTokenNew string
+
+	accessTokenNew, err = GenerateAccessToken(*payload, jwtSecret)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	refreshTokenNew, err = GenerateRefreshToken(*payload, jwtSecret)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	var refreshSessionNew models.RefreshSession
+	refreshSessionNew.ID = uuid.New()
+	refreshSessionNew.UserID = payload.clientId
+	refreshSessionNew.RefreshToken = refreshTokenNew
+	refreshSessionNew.FingerPrint = fingerprint
+
+	_, err = a.refreshSessionRepo.CreateRefreshSession(refreshSessionNew)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	user, err := a.userRepo.GetUserByEmail(payload.email)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	return user, accessTokenNew, refreshTokenNew, nil
+}
+
 func HashPassword(password string) (string, error) {
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
@@ -160,4 +230,20 @@ func GenerateRefreshToken(payload payload, jwtSecret []byte) (string, error) {
 
 	// Sign the token with the secret
 	return token.SignedString(jwtSecret)
+}
+
+func verifyRefreshToken(refreshToken string) (*jwt.Token, error) {
+	// Secret key
+	secret := []byte(viper.GetString("jwtSecret"))
+
+	// Verify the token
+	token, err := jwt.Parse(refreshToken, func(token *jwt.Token) (interface{}, error) {
+		return secret, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
 }

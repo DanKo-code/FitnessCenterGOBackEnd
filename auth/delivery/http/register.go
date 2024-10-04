@@ -16,6 +16,7 @@ func RegisterHTTPEndpoints(router *gin.Engine, uc auth.UseCase, validator *valid
 		authEndPoints.POST("/signUp", h.SignUp)
 		authEndPoints.POST("/signIn", h.SignIn)
 		authEndPoints.POST("/logOut", h.LogOut)
+		authEndPoints.POST("/refresh", h.Refresh)
 	}
 
 }
